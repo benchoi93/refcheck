@@ -1,0 +1,11 @@
+{
+  "name": "refcheck",
+  "owner": { "name": "Seongjin Choi", "email": "chois@umn.edu" },
+  "plugins": [
+    {
+      "name": "refcheck",
+      "source": "./",
+      "description": "Verify academic citations, find real papers, and export BibTeX."
+    }
+  ]
+}

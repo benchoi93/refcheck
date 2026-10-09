@@ -1,4 +1,4 @@
-"""CLI entry point for refcheck — replaces MCP stdio with direct command-line usage."""
+"""refcheck CLI: verify, search, bibtex. Prints JSON to stdout; per-database errors go to stderr."""
 
 import asyncio
 import json
@@ -227,7 +227,7 @@ async def cmd_bibtex(
 
 
 # ---------------------------------------------------------------------------
-# Shared helpers (adapted from server.py, no MCP Context dependency)
+# Shared helpers
 # ---------------------------------------------------------------------------
 
 def _to_matched_ref(paper: PaperMetadata) -> MatchedReference:
@@ -369,7 +369,7 @@ def _deduplicate(papers):
 # Main CLI dispatcher
 # ---------------------------------------------------------------------------
 
-USAGE = """Usage: python -m refcheck.cli <command> [JSON args]
+USAGE = """Usage: refcheck <command> [JSON args]
 
 Commands:
   verify   '{"title": "...", "doi": "...", "authors": [...], "year": 2024, "venue": "..."}'

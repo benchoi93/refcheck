@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "refcheck-mcp"
-version = "0.1.0"
-description = "MCP server for academic reference verification against Crossref, Semantic Scholar, arXiv, Scopus, and IEEE Xplore"
+name = "refcheck"
+version = "0.2.0"
+description = "Claude Code skill + CLI for academic reference verification against Crossref, Semantic Scholar, arXiv, Scopus, and IEEE Xplore"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -13,7 +13,8 @@ authors = [
     { name = "Seongjin Choi", email = "chois@umn.edu" },
 ]
 keywords = [
-    "mcp",
+    "claude-code",
+    "skill",
     "academic",
     "references",
     "bibtex",
@@ -34,7 +35,6 @@ classifiers = [
     "Topic :: Text Processing :: Markup :: LaTeX",
 ]
 dependencies = [
-    "mcp>=1.2.0",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "rapidfuzz>=3.0.0",
@@ -47,7 +47,7 @@ Repository = "https://github.com/benchoi93/refcheck"
 Issues = "https://github.com/benchoi93/refcheck/issues"
 
 [project.scripts]
-refcheck = "refcheck.server:main"
+refcheck = "refcheck.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/refcheck"]

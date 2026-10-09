@@ -1,67 +1,63 @@
 # refcheck
 
-<!-- mcp-name: io.github.benchoi93/refcheck -->
-
-[![PyPI version](https://img.shields.io/pypi/v/refcheck-mcp)](https://pypi.org/project/refcheck-mcp/)
-[![Python 3.11+](https://img.shields.io/pypi/pyversions/refcheck-mcp)](https://pypi.org/project/refcheck-mcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.benchoi93/refcheck)
 
 **Academic reference verification for AI assistants.**
 
-An [MCP](https://modelcontextprotocol.io/) server that cross-checks academic citations against real publication databases. It catches hallucinated references, finds real papers on a topic, and exports publication-ready BibTeX — all from within Claude Code, Claude Desktop, or any MCP-compatible client.
+A [Claude Code](https://claude.com/claude-code) skill plus a small CLI that checks academic citations against real publication databases. It catches hallucinated references, finds real papers on a topic, and exports publication-ready BibTeX.
+
+> **v0.2 drops the MCP server.** refcheck is now a skill that calls the `refcheck` CLI through Bash. That means no long-running server, no MCP config, and the CLI works the same way in a plain terminal. If you used `refcheck-mcp`, remove its `mcpServers` entry and follow the steps below.
 
 ## The Problem
 
 Large language models frequently hallucinate academic citations: plausible-looking references with fabricated titles, authors, DOIs, or venues. A single hallucinated citation in a paper or grant proposal can undermine credibility.
 
-**refcheck** solves this by giving your AI assistant direct access to Crossref, Semantic Scholar, and arXiv. Every reference it returns is backed by a real database record.
+refcheck gives your assistant direct access to Crossref, Semantic Scholar, arXiv, Scopus, and IEEE Xplore. Every reference it returns is backed by a real database record.
 
 ## What It Does
 
-| Tool | Purpose |
-|------|---------|
-| `verify_reference` | Check if a citation is real. Returns `verified`, `partial_match`, or `not_found` with a confidence score and corrected BibTeX. |
-| `search_references` | Find real papers on a topic. Never fabricates — only returns database-backed results. |
-| `get_bibtex` | Export publication-ready BibTeX by DOI, title, or Semantic Scholar ID. Supports batch export. |
+| Command | Purpose |
+|---------|---------|
+| `refcheck verify` | Check if a citation is real. Returns `verified`, `partial_match`, or `not_found` with a confidence score and corrected BibTeX. |
+| `refcheck search` | Find real papers on a topic. Never fabricates; only returns database-backed results. |
+| `refcheck bibtex` | Export publication-ready BibTeX by DOI, title, or Semantic Scholar ID. Supports batch export. |
 
 ## Quick Start
 
-### 1. Install
+### 1. Install the CLI
 
 ```bash
-pip install refcheck-mcp
+pip install git+https://github.com/benchoi93/refcheck.git
 ```
 
-Or install from source:
+Or from source: `git clone https://github.com/benchoi93/refcheck.git && pip install -e refcheck`. Requires Python 3.10+.
+
+### 2. Install the skill
+
+In Claude Code:
+
+```
+/plugin marketplace add https://github.com/benchoi93/refcheck.git
+/plugin install refcheck@refcheck
+```
+
+Or, without the plugin system, copy the skill directory:
 
 ```bash
-git clone https://github.com/benchoi93/refcheck.git
-cd refcheck
-pip install -e .
+mkdir -p ~/.claude/skills && cp -r skills/refcheck ~/.claude/skills/
 ```
 
-**Requirements:** Python 3.11+
+### 3. (Optional) Add API keys
 
-### 2. Configure Claude Code
-
-Add to your Claude Code settings (`~/.claude.json`):
-
-```json
-{
-  "mcpServers": {
-    "refcheck": {
-      "command": "python",
-      "args": ["-m", "refcheck"],
-      "env": {
-        "CROSSREF_EMAIL": "you@university.edu"
-      }
-    }
-  }
-}
+```bash
+mkdir -p ~/.config/refcheck && cp .env.example ~/.config/refcheck/.env   # then edit
 ```
 
-### 3. Use It
+See [Configuration](#configuration).
+
+### 4. Use it
+
+Ask Claude Code naturally. The skill triggers on citation, BibTeX, and paper-finding requests:
 
 ```
 > Verify this reference: Li, Y., Yu, R., Shahabi, C., & Liu, Y. (2018).
@@ -71,19 +67,25 @@ Add to your Claude Code settings (`~/.claude.json`):
 > Find me 5 recent papers on physics-informed neural networks for traffic
   state estimation and get their BibTeX.
 
-> Get BibTeX for DOI 10.1016/j.trc.2024.104873
-
 > Verify all references in my refs.bib and replace any incorrect entries
   with the corrected BibTeX.
 ```
 
-## Tools
+Or call the CLI directly. Each command takes one JSON argument and prints JSON:
 
-### `verify_reference`
+```bash
+refcheck verify '{"title": "Attention is all you need", "year": 2017}'
+refcheck search '{"query": "traffic state estimation", "max_results": 5, "year_from": 2020}'
+refcheck bibtex '{"doi": "10.1016/j.trc.2024.104873"}'
+```
+
+## Commands
+
+### `refcheck verify`
 
 Checks whether a citation is real by querying multiple databases and fuzzy-matching the results.
 
-**Parameters:**
+**Parameters** (JSON keys):
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -128,11 +130,11 @@ Checks whether a citation is real by querying multiple databases and fuzzy-match
 }
 ```
 
-### `search_references`
+### `refcheck search`
 
 Searches for real papers across all configured databases. Results are deduplicated by DOI and title similarity.
 
-**Parameters:**
+**Parameters** (JSON keys):
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -144,11 +146,11 @@ Searches for real papers across all configured databases. Results are deduplicat
 
 **Each result includes:** title, authors, year, DOI, venue, abstract (truncated), URL, and source database.
 
-### `get_bibtex`
+### `refcheck bibtex`
 
 Generates verified BibTeX entries. Prefers Crossref content negotiation (publisher-quality BibTeX) and falls back to metadata construction when needed.
 
-**Parameters (provide one):**
+**Parameters** (JSON keys, provide one):
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -159,11 +161,11 @@ Generates verified BibTeX entries. Prefers Crossref content negotiation (publish
 
 **Example — batch DOI export:**
 
-```
-get_bibtex(dois=["10.1016/j.trc.2024.104873", "10.48550/arXiv.1706.03762"])
+```bash
+refcheck bibtex '{"dois": ["10.1016/j.trc.2024.104873", "10.48550/arXiv.1706.03762"]}'
 ```
 
-Returns concatenated BibTeX entries ready to append to a `.bib` file:
+The `bibtex` field holds concatenated entries ready to append to a `.bib` file:
 
 ```bibtex
 @article{vaswani2017attention,
@@ -194,17 +196,11 @@ refcheck queries multiple academic databases in parallel. It works out of the bo
 | **Scopus** | Yes | 90M+ records | Elsevier API key + optional institutional token. |
 | **IEEE Xplore** | Yes | IEEE/IET publications | Free tier: 200 requests/day. |
 
-The server operates in **degraded mode** when keys are missing — it skips unavailable APIs and reports which sources were checked.
+refcheck runs in **degraded mode** when keys are missing — it skips unavailable APIs and reports which sources were checked.
 
 ## Configuration
 
-Copy the example env file and fill in your keys:
-
-```bash
-cp .env.example .env
-```
-
-Then edit `.env`:
+All keys are optional. Precedence, highest first: the process environment, `./.env`, `~/.config/refcheck/.env`, then the repo-root `.env` (editable installs only).
 
 ```bash
 # Strongly recommended — enables Crossref "polite pool" (~50 req/sec)
@@ -222,39 +218,29 @@ ELSEVIER_INSTTOKEN=
 IEEE_API_KEY=
 ```
 
-The `.env` file is gitignored. The server loads it automatically on startup via `python-dotenv`.
-
-Alternatively, you can set environment variables directly or pass them in the `env` block of your MCP server config in `~/.claude.json`.
-
 ## Architecture
 
 ```
 refcheck/
-├── src/refcheck/              # Python package
-│   ├── __init__.py            # Package version
-│   ├── __main__.py            # python -m refcheck entry point
-│   ├── server.py              # FastMCP server, three tool definitions
-│   ├── clients/
-│   │   ├── __init__.py        # Client protocol & registry
-│   │   ├── crossref.py        # Crossref: DOI lookup, title search, BibTeX export
-│   │   ├── semantic_scholar.py # Semantic Scholar: keyword search, paper lookup
-│   │   ├── arxiv.py           # arXiv: title/keyword search, XML parsing
-│   │   ├── scopus.py          # Scopus: search with API key (optional)
-│   │   └── ieee.py            # IEEE Xplore: search with API key (optional)
+├── .claude-plugin/
+│   ├── plugin.json            # Claude Code plugin manifest
+│   └── marketplace.json       # Single-plugin marketplace (for /plugin marketplace add)
+├── skills/refcheck/SKILL.md   # The skill: when and how to call the CLI
+├── src/refcheck/
+│   ├── cli.py                 # `refcheck` entry point: verify / search / bibtex
+│   ├── clients/               # Crossref, Semantic Scholar, arXiv, Scopus, IEEE
 │   ├── matching.py            # Fuzzy matching: title, author, year, venue scoring
 │   ├── bibtex.py              # BibTeX generation, formatting, citation keys
-│   ├── models.py              # Pydantic v2 input/output models
-│   └── config.py              # Environment variable management
-├── pyproject.toml             # Package metadata & dependencies
-├── server.json                # MCP Registry metadata
-└── requirements.txt           # Pinned dependencies (alternative to pyproject.toml)
+│   ├── models.py              # Pydantic v2 output models
+│   └── config.py              # API key loading
+└── pyproject.toml
 ```
 
 **Key design decisions:**
 - **Async throughout** — All API calls use `httpx.AsyncClient` with 10-second timeouts.
-- **Parallel queries** — Multiple databases are queried simultaneously via `asyncio.gather`.
-- **Graceful degradation** — One failing API never blocks others. Errors are logged to stderr and the response indicates which sources were checked.
-- **Never fabricates** — If no match is found, the tool says so. BibTeX fields are omitted rather than guessed.
+- **Parallel queries** — Databases are queried simultaneously via `asyncio.gather`.
+- **Graceful degradation** — One failing API never blocks the others. Errors go to stderr; stdout is always valid JSON and lists which sources were checked.
+- **Never fabricates** — If no match is found, refcheck says so. BibTeX fields are left out rather than guessed.
 
 ## Use Cases
 
@@ -281,6 +267,6 @@ MIT
 If you use refcheck in your research workflow, a mention is appreciated:
 
 ```
-refcheck: Academic Reference Verification MCP Server
+refcheck: Academic Reference Verification for AI Assistants
 https://github.com/benchoi93/refcheck
 ```

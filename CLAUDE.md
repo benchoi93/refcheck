@@ -1,12 +1,12 @@
-# refcheck — Academic Reference Verification MCP Server
+# refcheck — Academic Reference Verification (Claude Code skill + CLI)
 
 ## Project Overview
 
-Build an MCP server (`refcheck`) that verifies academic references against real publication databases, searches for legitimate references, and exports verified BibTeX entries. This prevents AI hallucinated citations by cross-checking against Crossref, Semantic Scholar, arXiv, and optionally Scopus and IEEE Xplore APIs.
+`refcheck` is a Claude Code skill backed by a Python CLI that verifies academic references against real publication databases, searches for legitimate references, and exports verified BibTeX entries. This prevents AI hallucinated citations by cross-checking against Crossref, Semantic Scholar, arXiv, and optionally Scopus and IEEE Xplore APIs.
 
 ## Problem Statement
 
-LLMs frequently hallucinate academic citations — generating plausible-looking but nonexistent references with fabricated titles, authors, DOIs, or venues. This MCP provides three capabilities:
+LLMs frequently hallucinate academic citations — generating plausible-looking but nonexistent references with fabricated titles, authors, DOIs, or venues. refcheck provides three capabilities:
 
 1. **Verify** a given reference against real databases and return a confidence verdict
 2. **Search** for real, verified references on a topic so the AI never needs to fabricate one
@@ -16,31 +16,33 @@ LLMs frequently hallucinate academic citations — generating plausible-looking 
 
 ```
 refcheck/
-├── server.py              # FastMCP server entry point, tool registration
-├── clients/
-│   ├── crossref.py        # Crossref API client (no key, DOI backbone)
-│   ├── semantic_scholar.py # Semantic Scholar API client (free key)
-│   ├── arxiv.py           # arXiv API client (no key)
-│   ├── scopus.py          # Elsevier/Scopus API client (key required)
-│   └── ieee.py            # IEEE Xplore API client (key required)
-├── bibtex.py              # BibTeX generation and formatting
-├── matching.py            # Fuzzy matching logic for verification
-├── models.py              # Pydantic input/output models
-├── config.py              # API key management via environment variables
-├── requirements.txt
-└── README.md
+├── .claude-plugin/{plugin.json,marketplace.json}  # Claude Code plugin + single-plugin marketplace
+├── skills/refcheck/SKILL.md   # Skill: tells Claude when/how to call the CLI via Bash
+└── src/refcheck/
+    ├── cli.py                 # `refcheck verify|search|bibtex '<json>'` → JSON on stdout
+    ├── clients/
+    │   ├── crossref.py        # Crossref API client (no key, DOI backbone)
+    │   ├── semantic_scholar.py # Semantic Scholar API client (free key)
+    │   ├── arxiv.py           # arXiv API client (no key)
+    │   ├── scopus.py          # Elsevier/Scopus API client (key required)
+    │   └── ieee.py            # IEEE Xplore API client (key required)
+    ├── bibtex.py              # BibTeX generation and formatting
+    ├── matching.py            # Fuzzy matching logic for verification
+    ├── models.py              # Pydantic output models
+    └── config.py              # API keys from env / .env files
 ```
+
+There is no MCP server (removed in v0.2). The skill is the interface; the CLI is the engine. When you change a CLI parameter or output field, update `skills/refcheck/SKILL.md` and `README.md` in the same commit.
 
 ## Technology Stack
 
-- **Language**: Python 3.11+
-- **MCP Framework**: FastMCP (`mcp` Python SDK)
+- **Language**: Python 3.10+
+- **Interface**: Claude Code skill → `refcheck` CLI (one JSON arg in, JSON out)
 - **HTTP Client**: `httpx` (async)
 - **Validation**: Pydantic v2
 - **Fuzzy Matching**: `rapidfuzz` (Levenshtein distance, token set ratio)
-- **Transport**: stdio (for Claude Code local usage)
 
-## Tools to Implement
+## Commands (`verify`, `search`, `bibtex`)
 
 ### Tool 1: `verify_reference`
 
@@ -257,7 +259,7 @@ There is no official Google Scholar API. All available options involve scraping 
 
 ## Configuration
 
-Use environment variables for API keys. The server should work in **degraded mode** — if a key is missing, skip that API and note it in the response. Crossref and arXiv always work (no key needed), so the server is always functional.
+Use environment variables for API keys. refcheck should work in **degraded mode** — if a key is missing, skip that API and note it in the response. Crossref and arXiv always work (no key needed), so refcheck is always functional.
 
 ```python
 # config.py
@@ -362,33 +364,20 @@ def protect_capitals(title: str) -> str:
 
 ## Claude Code Integration
 
-### Installation in `~/.claude.json`
-
-```json
-{
-  "mcpServers": {
-    "refcheck": {
-      "command": "python",
-      "args": ["/path/to/refcheck/server.py"],
-      "env": {
-        "CROSSREF_EMAIL": "your@umn.edu",
-        "S2_API_KEY": "your-s2-key",
-        "SCOPUS_API_KEY": "your-key-here",
-        "IEEE_API_KEY": "your-key-here"
-      }
-    }
-  }
-}
 ```
+pip install git+https://github.com/benchoi93/refcheck.git
+/plugin marketplace add https://github.com/benchoi93/refcheck.git
+/plugin install refcheck@refcheck
+```
+
+Keys go in `~/.config/refcheck/.env` (see `.env.example`). Smoke test: `refcheck bibtex '{"doi": "10.1016/j.trc.2021.103091"}'`.
 
 ### Example Usage in Claude Code
 
 ```
-> Use refcheck to verify this reference: Li, Y., Yu, R., Shahabi, C., & Liu, Y. (2018). Diffusion convolutional recurrent neural network: Data-driven traffic forecasting. ICLR 2018.
+> Verify this reference: Li, Y., Yu, R., Shahabi, C., & Liu, Y. (2018). Diffusion convolutional recurrent neural network: Data-driven traffic forecasting. ICLR 2018.
 
-> Search refcheck for recent papers on physics-informed neural networks for traffic state estimation, get me bibtex for the top 5.
-
-> Get bibtex for DOI 10.1109/TITS.2021.3054197
+> Find recent papers on physics-informed neural networks for traffic state estimation, get me bibtex for the top 5.
 
 > Get bibtex for these DOIs and save to references.bib: 10.1109/TITS.2021.3054197, 10.48550/arXiv.1706.03762, 10.1145/3292500.3330919
 ```
@@ -402,11 +391,11 @@ def protect_capitals(title: str) -> str:
 5. **`clients/arxiv.py`** — Implement arXiv client
 6. **`matching.py`** — Fuzzy matching functions with unit tests
 7. **`bibtex.py`** — BibTeX generation and formatting utilities
-8. **`server.py`** — Wire up the FastMCP server with all three tools
+8. **`cli.py`** — Wire up the three commands (JSON in, JSON out)
 9. **Test end-to-end** — Verify with known real papers, fake citations, and BibTeX output
 10. **`clients/scopus.py`** — Add Scopus client (optional)
 11. **`clients/ieee.py`** — Add IEEE client (optional)
-12. **Integration test** — Test with Claude Code
+12. **Integration test** — Test the skill in Claude Code
 
 ## Testing Strategy
 

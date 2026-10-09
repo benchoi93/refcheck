@@ -6,8 +6,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load .env from CWD (where the MCP server is launched), then fallback to repo root
+# Load .env from CWD, then ~/.config/refcheck/.env (works from any cwd), then repo root
 load_dotenv(Path.cwd() / ".env")
+load_dotenv(Path.home() / ".config" / "refcheck" / ".env")
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 

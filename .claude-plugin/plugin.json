@@ -1,0 +1,9 @@
+{
+  "name": "refcheck",
+  "version": "0.2.0",
+  "description": "Verify academic citations, find real papers, and export BibTeX via Crossref, Semantic Scholar, arXiv, Scopus, and IEEE.",
+  "author": { "name": "Seongjin Choi", "email": "chois@umn.edu" },
+  "homepage": "https://github.com/benchoi93/refcheck",
+  "repository": "https://github.com/benchoi93/refcheck",
+  "license": "MIT"
+}
